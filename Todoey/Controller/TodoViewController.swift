@@ -9,24 +9,28 @@
 import UIKit
 
 //EEEEEE inherits from class UITableViewController so that we don't have to create new UIVIEWS and conform to UITableView DataSource / Delegate Protocols again as we did in <i\> flashchat
+
 class TodoViewController: UITableViewController {
+//    let defaults = UserDefaults.standard; //WOULD NOT WORK BECAUSE OF LIMITED DATA TYPE IT ACCEPTS
+    
     var itemsArray = [Item]();
     
-    let defaults = UserDefaults.standard;
+    //Creating our customized plist path (NSCoder)
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist");
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         //TELL TODOEY WHAT THE USER HAS STORED IN THE PLIST
-        
         var newItem = Item();
         newItem.itemValue = "First";
         itemsArray.append(newItem)
         tableView.reloadData();
         
-        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
-            itemsArray = items;
-        }
-        
+//        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
+//            itemsArray = items;
+//        }
+        loadItemsFromLocal();
     }
     
     //MARK - Table View Data Source Methods
@@ -50,7 +54,7 @@ class TodoViewController: UITableViewController {
         
         
         itemsArray[indexPath.row].itemStatus = !itemsArray[indexPath.row].itemStatus;
-        
+        saveDataToLocal();
         //Everytime we click an item make sure we update the array / display (i.e. trigger the methods properly)
         tableView.reloadData();
         //Make it flashes while you click it
@@ -74,7 +78,7 @@ class TodoViewController: UITableViewController {
             newItem.itemValue = textField.text ?? "New Item";
             self.itemsArray.append(newItem);
             //gets set in plist
-            self.defaults.set(self.itemsArray, forKey: "ToDoListArray");
+            self.saveDataToLocal();
             self.tableView.reloadData();
         }
         alert.addAction(action);
@@ -85,5 +89,26 @@ class TodoViewController: UITableViewController {
         present(alert, animated: true, completion: nil);
     }
     
+    //MARK - Model Manipulation Methods
+    func saveDataToLocal() {
+        let encoder = PropertyListEncoder();
+        do {
+            let data = try encoder.encode(itemsArray);
+            try data.write(to: dataFilePath!);
+        } catch {
+            print("Error encoding into Plist \(error.localizedDescription)");
+        }
+    }
+    
+    func loadItemsFromLocal() {
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do {
+                itemsArray = try decoder.decode([Item].self, from: data)
+            } catch {
+                print("Error decoding the Plist\(error.localizedDescription)")
+            }
+        }
+    }
 }
 
