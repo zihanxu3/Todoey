@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import CoreData
 
 //EEEEEE inherits from class UITableViewController so that we don't have to create new UIVIEWS and conform to UITableView DataSource / Delegate Protocols again as we did in <i\> flashchat
 
@@ -15,17 +16,12 @@ class TodoViewController: UITableViewController {
     
     var itemsArray = [Item]();
     
-    //Creating our customized plist path (NSCoder)
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist");
+    //Tap into access into Appdelegate
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext;
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        //TELL TODOEY WHAT THE USER HAS STORED IN THE PLIST
-        var newItem = Item();
-        newItem.itemValue = "First";
-        itemsArray.append(newItem)
-        tableView.reloadData();
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask));
         
 //        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
 //            itemsArray = items;
@@ -41,10 +37,10 @@ class TodoViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath);
         let currentItem = itemsArray[indexPath.row];
-        cell.textLabel?.text = currentItem.itemValue;
+        cell.textLabel?.text = currentItem.title;
         
         //Ternary Operator => value = [condition] ? [value if true] : [value if false]
-        cell.accessoryType = currentItem.itemStatus ? .checkmark : .none;
+        cell.accessoryType = currentItem.done ? .checkmark : .none;
         return cell
     }
     
@@ -53,7 +49,7 @@ class TodoViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         
-        itemsArray[indexPath.row].itemStatus = !itemsArray[indexPath.row].itemStatus;
+        itemsArray[indexPath.row].done = !itemsArray[indexPath.row].done;
         saveDataToLocal();
         //Everytime we click an item make sure we update the array / display (i.e. trigger the methods properly)
         tableView.reloadData();
@@ -74,8 +70,10 @@ class TodoViewController: UITableViewController {
         var textField = UITextField();
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert);
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
-            var newItem = Item();
-            newItem.itemValue = textField.text ?? "New Item";
+            //Tap into access into Appdelegate
+            let newItem = Item(context: self.context);
+            newItem.title = textField.text ?? "New Item";
+            newItem.done = false;
             self.itemsArray.append(newItem);
             //gets set in plist
             self.saveDataToLocal();
@@ -91,23 +89,19 @@ class TodoViewController: UITableViewController {
     
     //MARK - Model Manipulation Methods
     func saveDataToLocal() {
-        let encoder = PropertyListEncoder();
         do {
-            let data = try encoder.encode(itemsArray);
-            try data.write(to: dataFilePath!);
+            try context.save();
         } catch {
-            print("Error encoding into Plist \(error.localizedDescription)");
+            print("Error saving data to local: \(error.localizedDescription)")
         }
     }
     
     func loadItemsFromLocal() {
-        if let data = try? Data(contentsOf: dataFilePath!) {
-            let decoder = PropertyListDecoder()
-            do {
-                itemsArray = try decoder.decode([Item].self, from: data)
-            } catch {
-                print("Error decoding the Plist\(error.localizedDescription)")
-            }
+        let request : NSFetchRequest<Item> = Item.fetchRequest();
+        do {
+            itemsArray = try context.fetch(request);
+        } catch {
+            print("Error loading data from local: \(error.localizedDescription)")
         }
     }
 }
