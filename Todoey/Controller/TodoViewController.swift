@@ -16,17 +16,26 @@ class TodoViewController: UITableViewController {
     
     var itemsArray = [Item]();
     
+    var selectedCategory: Category? {
+        didSet {
+            let request: NSFetchRequest<Item> = Item.fetchRequest();
+            request.predicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
+            loadItemsFromLocal(with: request);
+        }
+    }
+    
     //Tap into access into Appdelegate
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext;
+    
+    @IBOutlet weak var searchBar: UISearchBar!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask));
-        
+        searchBar.delegate = self;
 //        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
 //            itemsArray = items;
 //        }
-        loadItemsFromLocal();
     }
     
     //MARK - Table View Data Source Methods
@@ -74,6 +83,8 @@ class TodoViewController: UITableViewController {
             let newItem = Item(context: self.context);
             newItem.title = textField.text ?? "New Item";
             newItem.done = false;
+            //set the parent category of each item
+            newItem.parentCategory = self.selectedCategory;
             self.itemsArray.append(newItem);
             //gets set in plist
             self.saveDataToLocal();
@@ -96,12 +107,34 @@ class TodoViewController: UITableViewController {
         }
     }
     
-    func loadItemsFromLocal() {
-        let request : NSFetchRequest<Item> = Item.fetchRequest();
+    // = ?? Default value: used when pass no parameters
+    func loadItemsFromLocal(with request: NSFetchRequest<Item> = Item.fetchRequest()) {
         do {
             itemsArray = try context.fetch(request);
         } catch {
             print("Error loading data from local: \(error.localizedDescription)")
+        }
+        tableView.reloadData();
+    }
+}
+
+extension TodoViewController: UISearchBarDelegate {
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request: NSFetchRequest<Item> = Item.fetchRequest();
+        //Add a filter
+        request.predicate = NSPredicate(format: "title CONTAINS %@", searchBar.text!);
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        loadItemsFromLocal(with: request);
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if (searchBar.text!.count == 0) {
+            loadItemsFromLocal();
+            // resign the keyboard and cursor from the MAIN THREAD, go to the background
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder();
+            }
         }
     }
 }
